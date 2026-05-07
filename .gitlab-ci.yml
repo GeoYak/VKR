@@ -1,0 +1,67 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  IMAGE_BACKEND: $CI_REGISTRY_IMAGE/backend
+  IMAGE_FRONTEND: $CI_REGISTRY_IMAGE/frontend
+
+build_backend:
+  stage: build
+  image: docker:24-cli
+  services:
+    - docker:24-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  tags:
+    - docker
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t $IMAGE_BACKEND:latest ./backend
+    - docker push $IMAGE_BACKEND:latest
+  only:
+    - main
+
+
+build_frontend:
+  stage: build
+  image: docker:24-cli
+  services:
+    - docker:24-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  tags:
+    - docker
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t $IMAGE_FRONTEND:latest ./frontend
+    - docker push $IMAGE_FRONTEND:latest
+  only:
+    - main
+
+
+deploy:
+  stage: deploy
+  image: alpine:latest
+  tags:
+    - docker
+
+  before_script:
+    - apk add --no-cache openssh-client
+
+  script:
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan -H $SERVER_IP >> ~/.ssh/known_hosts
+
+    - ssh $SERVER_USER@$SERVER_IP "
+        cd /app &&
+        docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY &&
+        docker compose pull &&
+        docker compose up -d --remove-orphans"
+
+  only:
+    - main

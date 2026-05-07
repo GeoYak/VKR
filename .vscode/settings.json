@@ -1,0 +1,16 @@
+{
+    "python-envs.pythonProjects": [
+        {
+            "path": "backend/src/properties/filter.py",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        }
+    ],
+    "cSpell.words": [
+        "fastapi",
+        "Fdcw",
+        "healthcheck",
+        "ondelete",
+        "VITE"
+    ]
+}

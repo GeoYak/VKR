@@ -1,0 +1,81 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fastapi-postgres
+    environment:
+      POSTGRES_DB: VKR
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1234
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: fastapi_redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
+
+  backend:
+    image: registry.gitlab.com/georgy.yakushchev-group/georgy.yakushchev-project/backend:latest
+    build: ./backend
+    container_name: fastapi_backend
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: postgres
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app_network
+
+  frontend:
+    image: registry.gitlab.com/georgy.yakushchev-group/georgy.yakushchev-project/frontend:latest
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ""
+    container_name: fastapi_frontend
+    networks:
+      - app_network
+
+  nginx:
+    image: nginx:alpine
+    container_name: fastapi_nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - frontend_dist:/usr/share/nginx/html
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - app_network
+
+volumes:
+  postgres_data:
+  redis_data:
+  frontend_dist:
+
+networks:
+  app_network:
+    driver: bridge
